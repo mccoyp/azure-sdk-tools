@@ -1,6 +1,6 @@
 # ts-config-isolatedmodules
 
-Requires `compilerOptions.isolatedModules` in `tsconfig.json` to be set to `true`.
+Recommends `compilerOptions.isolatedModules` in `tsconfig.json` to be set to `true`.
 
 ## Examples
 
@@ -8,9 +8,9 @@ Requires `compilerOptions.isolatedModules` in `tsconfig.json` to be set to `true
 
 ```json
 {
-    "compilerOptions": {
-        "isolatedModules": true
-    }
+  "compilerOptions": {
+    "isolatedModules": true
+  }
 }
 ```
 
@@ -18,15 +18,15 @@ Requires `compilerOptions.isolatedModules` in `tsconfig.json` to be set to `true
 
 ```json
 {
-    "compilerOptions": {
-        "isolatedModules": false
-    }
+  "compilerOptions": {
+    "isolatedModules": false
+  }
 }
 ```
 
 ```json
 {
-    "compilerOptions": {}
+  "compilerOptions": {}
 }
 ```
 
