@@ -3,9 +3,13 @@
  * @author Arpan Laha
  */
 
+import {
+  ParserServices,
+  TSESTree
+} from "@typescript-eslint/experimental-utils";
+import { ParserWeakMap } from "@typescript-eslint/typescript-estree/dist/parser-options";
 import { Rule } from "eslint";
 import {
-  AssignmentPattern,
   FunctionDeclaration,
   FunctionExpression,
   Identifier,
@@ -17,7 +21,7 @@ import {
   isArrayTypeNode,
   Node as TSNode,
   PropertySignature,
-  Symbol,
+  Symbol as TSSymbol,
   SymbolFlags,
   Type,
   TypeChecker,
@@ -26,11 +30,6 @@ import {
   Modifier,
   SyntaxKind
 } from "typescript";
-import {
-  ParserServices,
-  TSESTree
-} from "@typescript-eslint/experimental-utils";
-import { ParserWeakMap } from "@typescript-eslint/typescript-estree/dist/parser-options";
 import { getRuleMetaData } from "../utils";
 
 //------------------------------------------------------------------------------
@@ -44,14 +43,8 @@ type FunctionType = FunctionExpression | FunctionDeclaration;
  * @param param the parameter node
  * @return the identifier node associated with the parameter
  */
-const getParamAsIdentifier = (param: Pattern): Identifier => {
-  let identifier = param;
-  if (param.type === "AssignmentPattern") {
-    const assignmentPattern: AssignmentPattern = param as AssignmentPattern;
-    identifier = assignmentPattern.left;
-  }
-  return identifier as Identifier;
-};
+const getParamAsIdentifier = (param: Pattern): Identifier =>
+  (param.type === "AssignmentPattern" ? param.left! : param) as Identifier;
 
 /**
  * Gets the type of a paramter
@@ -68,6 +61,8 @@ const getTypeOfParam = (
   const type = typeChecker.getTypeAtLocation(
     converter.get(getParamAsIdentifier(param) as TSESTree.Node)
   ) as TypeReference;
+
+  // if array, extract type from array
   const typeNode = typeChecker.typeToTypeNode(type);
   if (typeNode !== undefined && isArrayTypeNode(typeNode)) {
     const elementTypeReference = typeNode.elementType as TypeReferenceNode;
@@ -76,10 +71,10 @@ const getTypeOfParam = (
       return typeChecker.getDeclaredTypeOfSymbol(typeName.symbol);
     }
   }
+
   return type;
 };
 
-/* eslint-disable @typescript-eslint/ban-types */
 /**
  * Recursive helper method to track the types seen in a parameter (including member types)
  * @param symbol The Symbol being inspected for member types
@@ -87,13 +82,15 @@ const getTypeOfParam = (
  * @param typeChecker the TypeScript language typechecker
  */
 const addSeenSymbols = (
-  symbol: Symbol,
-  symbols: Symbol[],
+  symbol: TSSymbol,
+  symbols: TSSymbol[],
   typeChecker: TypeChecker
 ): void => {
   let isExternal = false;
   let isOptional = false;
-  const declaration: PropertySignature = symbol.valueDeclaration as PropertySignature;
+
+  // check to see if parameter is either external or optional (in which case it would be ignored)
+  const declaration = symbol.valueDeclaration as PropertySignature;
   if (declaration !== undefined) {
     isOptional = declaration.questionToken !== undefined;
     isExternal = /node_modules/.test(declaration.getSourceFile().fileName);
@@ -101,15 +98,22 @@ const addSeenSymbols = (
   if (isExternal || isOptional) {
     return;
   }
+
   symbols.push(symbol);
+
+  // recurse on properties of parameter
   typeChecker
     .getPropertiesOfType(typeChecker.getDeclaredTypeOfSymbol(symbol))
-    .forEach((element: Symbol): void => {
+    .forEach((element: TSSymbol): void => {
       const memberType = typeChecker.getTypeAtLocation(
         element.valueDeclaration
       );
       const memberTypeNode = typeChecker.typeToTypeNode(memberType);
-      let memberSymbol: Symbol | undefined;
+
+      // extract type of member
+      let memberSymbol: TSSymbol | undefined;
+
+      // get type from array if parameter is array
       if (memberTypeNode !== undefined && isArrayTypeNode(memberTypeNode)) {
         const elementTypeReference = memberTypeNode.elementType as TypeReferenceNode;
         const typeName = elementTypeReference.typeName as any;
@@ -117,12 +121,14 @@ const addSeenSymbols = (
       } else {
         memberSymbol = memberType.getSymbol();
       }
-      if (memberSymbol !== undefined) {
+      if (
+        memberSymbol !== undefined &&
         [SymbolFlags.Class, SymbolFlags.Interface].includes(
           memberSymbol.getFlags()
         ) &&
-          !symbols.includes(memberSymbol) &&
-          addSeenSymbols(memberSymbol, symbols, typeChecker);
+        !symbols.includes(memberSymbol)
+      ) {
+        addSeenSymbols(memberSymbol, symbols, typeChecker);
       }
     });
 };
@@ -138,8 +144,8 @@ const getSymbolsUsedInParam = (
   param: Pattern,
   converter: ParserWeakMap<TSESTree.Node, TSNode>,
   typeChecker: TypeChecker
-): Symbol[] => {
-  const symbols: Symbol[] = [];
+): TSSymbol[] => {
+  const symbols: TSSymbol[] = [];
   const symbol = getTypeOfParam(param, converter, typeChecker).getSymbol();
   if (symbol !== undefined) {
     addSeenSymbols(symbol, symbols, typeChecker);
@@ -159,17 +165,15 @@ const isValidParam = (
   converter: ParserWeakMap<TSESTree.Node, TSNode>,
   typeChecker: TypeChecker
 ): boolean => {
-  const tsIdentifier: TSESTree.Identifier = param as TSESTree.Identifier;
+  const tsIdentifier = param as TSESTree.Identifier;
   if (tsIdentifier.optional) {
     return true;
   }
   return getSymbolsUsedInParam(param, converter, typeChecker).every(
-    (symbol: Symbol): boolean => {
-      return symbol === undefined || symbol.getFlags() !== SymbolFlags.Class;
-    }
+    (symbol: TSSymbol): boolean =>
+      symbol === undefined || symbol.getFlags() !== SymbolFlags.Class
   );
 };
-/* eslint-enable @typescript-eslint/ban-types */
 
 /**
  * Finds if an a function is valid
@@ -182,13 +186,12 @@ const isValidOverload = (
   overloads: FunctionType[],
   converter: ParserWeakMap<TSESTree.Node, TSNode>,
   typeChecker: TypeChecker
-): boolean => {
-  return overloads.some((overload: FunctionType): boolean => {
-    return overload.params.every((overloadParam: Pattern): boolean => {
-      return isValidParam(overloadParam, converter, typeChecker);
-    });
-  });
-};
+): boolean =>
+  overloads.some((overload: FunctionType): boolean =>
+    overload.params.every((overloadParam: Pattern): boolean =>
+      isValidParam(overloadParam, converter, typeChecker)
+    )
+  );
 
 /**
  * Evaluates the overloads found for a function
@@ -244,7 +247,7 @@ export = {
   ),
 
   create: (context: Rule.RuleContext): Rule.RuleListener => {
-    const parserServices: ParserServices = context.parserServices;
+    const parserServices = context.parserServices as ParserServices;
     if (
       parserServices.program === undefined ||
       parserServices.esTreeNodeToTSNodeMap === undefined
@@ -264,101 +267,109 @@ export = {
     const verifiedMethods: string[] = [];
     const verifiedDeclarations: string[] = [];
 
-    return {
-      "MethodDefinition > FunctionExpression": (
-        node: FunctionExpression
-      ): void => {
-        const parent: MethodDefinition = context
-          .getAncestors()
-          .reverse()[0] as MethodDefinition;
-        const key: Identifier = parent.key as Identifier;
-        const name = key.name;
+    return /src/.test(context.getFilename())
+      ? ({
+          "MethodDefinition > FunctionExpression": (
+            node: FunctionExpression
+          ): void => {
+            const parent = context
+              .getAncestors()
+              .reverse()[0] as MethodDefinition;
+            const key = parent.key as Identifier;
+            const name = key.name;
 
-        if (
-          name !== undefined &&
-          name !== "" &&
-          verifiedMethods.includes(name)
-        ) {
-          return;
-        }
+            // ignore if name seen already
+            if (
+              name !== undefined &&
+              name !== "" &&
+              verifiedMethods.includes(name)
+            ) {
+              return;
+            }
 
-        const modifiers = converter.get(node as TSESTree.Node).modifiers;
-        if (
-          modifiers !== undefined &&
-          modifiers.some((modifier: Modifier): boolean => {
-            return modifier.kind === SyntaxKind.PrivateKeyword;
-          })
-        ) {
-          return;
-        }
+            // ignore if private methoc
+            const modifiers = converter.get(node as TSESTree.Node).modifiers;
+            if (
+              modifiers !== undefined &&
+              modifiers.some(
+                (modifier: Modifier): boolean =>
+                  modifier.kind === SyntaxKind.PrivateKeyword
+              )
+            ) {
+              return;
+            }
 
-        node.params.forEach((param: Pattern): void => {
-          if (!isValidParam(param, converter, typeChecker)) {
-            const symbol = typeChecker
-              .getTypeAtLocation(converter.get(node as TSESTree.Node))
-              .getSymbol();
-            const overloads =
-              symbol !== undefined
-                ? symbol.declarations.map(
-                    (declaration: Declaration): FunctionExpression => {
-                      const method: MethodDefinition = reverter.get(
-                        declaration as TSNode
-                      ) as MethodDefinition;
-                      return method.value;
-                    }
-                  )
-                : [];
-            evaluateOverloads(
-              overloads,
-              converter,
-              typeChecker,
-              verifiedMethods,
-              name,
-              param,
-              context
-            );
+            // iterate over parameters
+            node.params.forEach((param: Pattern): void => {
+              if (!isValidParam(param, converter, typeChecker)) {
+                const symbol = typeChecker
+                  .getTypeAtLocation(converter.get(node as TSESTree.Node))
+                  .getSymbol();
+                const overloads =
+                  symbol !== undefined
+                    ? symbol.declarations.map(
+                        (declaration: Declaration): FunctionExpression => {
+                          const method = reverter.get(
+                            declaration as TSNode
+                          ) as MethodDefinition;
+                          return method.value;
+                        }
+                      )
+                    : [];
+                evaluateOverloads(
+                  overloads,
+                  converter,
+                  typeChecker,
+                  verifiedMethods,
+                  name,
+                  param,
+                  context
+                );
+              }
+            });
+          },
+
+          FunctionDeclaration: (node: FunctionDeclaration): void => {
+            const id = node.id as Identifier;
+            const name = id.name;
+
+            // ignore if name seen already
+            if (
+              name !== undefined &&
+              name !== "" &&
+              verifiedDeclarations.includes(name)
+            ) {
+              return;
+            }
+
+            // iterate over parameters
+            node.params.forEach((param: Pattern): void => {
+              if (!isValidParam(param, converter, typeChecker)) {
+                const symbol = typeChecker
+                  .getTypeAtLocation(converter.get(node as TSESTree.Node))
+                  .getSymbol();
+                const overloads =
+                  symbol !== undefined
+                    ? symbol.declarations.map(
+                        (declaration: Declaration): FunctionDeclaration =>
+                          reverter.get(
+                            declaration as TSNode
+                          ) as FunctionDeclaration
+                      )
+                    : [];
+                evaluateOverloads(
+                  overloads,
+                  converter,
+                  typeChecker,
+                  verifiedDeclarations,
+                  name,
+                  param,
+                  context
+                );
+              }
+            });
           }
-        });
-      },
-
-      FunctionDeclaration: (node: FunctionDeclaration): void => {
-        const id: Identifier = node.id as Identifier;
-        const name = id.name;
-        if (
-          name !== undefined &&
-          name !== "" &&
-          verifiedDeclarations.includes(name)
-        ) {
-          return;
-        }
-
-        node.params.forEach((param: Pattern): void => {
-          if (!isValidParam(param, converter, typeChecker)) {
-            const symbol = typeChecker
-              .getTypeAtLocation(converter.get(node as TSESTree.Node))
-              .getSymbol();
-            const overloads =
-              symbol !== undefined
-                ? symbol.declarations.map(
-                    (declaration: Declaration): FunctionDeclaration => {
-                      return reverter.get(
-                        declaration as TSNode
-                      ) as FunctionDeclaration;
-                    }
-                  )
-                : [];
-            evaluateOverloads(
-              overloads,
-              converter,
-              typeChecker,
-              verifiedDeclarations,
-              name,
-              param,
-              context
-            );
-          }
-        });
-      }
-    } as Rule.RuleListener;
+        } as Rule.RuleListener)
+      : {};
   }
 };

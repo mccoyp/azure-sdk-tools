@@ -3,16 +3,18 @@
  * @author Arpan Laha
  */
 
-import { Rule } from "eslint";
-import { getLocalExports } from "../utils";
-import { Node } from "estree";
-import { Node as TSNode, TypeChecker } from "typescript";
-import { ParserWeakMap } from "@typescript-eslint/typescript-estree/dist/parser-options";
 import {
   ParserServices,
   TSESTree
 } from "@typescript-eslint/experimental-utils";
-import { getRuleMetaData } from "../utils";
+import { ParserWeakMap } from "@typescript-eslint/typescript-estree/dist/parser-options";
+import { Rule } from "eslint";
+import { Node } from "estree";
+import { readFileSync } from "fs";
+import { sync as globSync } from "glob";
+import { relative } from "path";
+import { Node as TSNode, TypeChecker } from "typescript";
+import { getLocalExports, getRuleMetaData } from "../utils";
 
 //------------------------------------------------------------------------------
 // Rule Definition
@@ -35,31 +37,70 @@ const reportInternal = (
   const tsNode = converter.get(node as TSESTree.Node) as any;
   const symbol = typeChecker.getTypeAtLocation(tsNode).getSymbol();
 
+  // if type is internal and has a TSDoc
   if (
     !context.settings.exported.includes(symbol) &&
     tsNode.jsDoc !== undefined
   ) {
+    // fetc all tags
     let TSDocTags: string[] = [];
     tsNode.jsDoc.forEach((TSDocComment: any): void => {
       TSDocTags = TSDocTags.concat(
         TSDocComment.tags !== undefined
-          ? TSDocComment.tags.map((TSDocTag: any): string => {
-              return TSDocTag.tagName.escapedText;
-            })
+          ? TSDocComment.tags.map(
+              (TSDocTag: any): string => TSDocTag.tagName.escapedText
+            )
           : []
       );
     });
 
-    TSDocTags.every((TSDocTag: string): boolean => {
-      return !/(ignore)|(internal)/.test(TSDocTag);
-    }) &&
+    // see if any match ignore or internal
+    if (
+      TSDocTags.every(
+        (TSDocTag: string): boolean => !/(ignore)|(internal)/.test(TSDocTag)
+      )
+    ) {
       context.report({
         node: node,
         message:
           "internal items with TSDoc comments should include an @internal or @ignore tag"
       });
+    }
   }
 };
+
+/**
+ * Determine whether this rule should examine a given file
+ * @param fileName the filename of the file in question
+ * @param exclude the list of files excluded by TypeDoc (other than those in node_modues)
+ * @returns false if not in src or is excluded by TypeDoc
+ */
+const shouldExamineFile = (fileName: string, exclude: string[]): boolean => {
+  if (!/src/.test(fileName)) {
+    return false;
+  }
+  const relativePath = relative("", fileName).replace(/\\/g, "/");
+  return !exclude.includes(relativePath);
+};
+
+let exclude: string[] = [];
+try {
+  const typeDocText = readFileSync("typedoc.json", "utf8");
+  const typeDoc = JSON.parse(typeDocText);
+
+  // if typeDoc.exclude exists, add all files matching the glob patterns to exclude
+  if (typeDoc.exclude !== undefined) {
+    typeDoc.exclude.forEach((excludedGlob: string): void => {
+      exclude = exclude.concat(
+        globSync(excludedGlob).filter(
+          (excludeFile: string): boolean => !/node_modules/.test(excludeFile)
+        )
+      );
+    });
+  }
+} catch (err) {
+  exclude = [];
+}
 
 export = {
   meta: getRuleMetaData(
@@ -68,7 +109,9 @@ export = {
   ),
   create: (context: Rule.RuleContext): Rule.RuleListener => {
     const fileName = context.getFilename();
-    if (/\.ts$/.test(fileName) && !context.settings.exported) {
+
+    // on the first run, if on a .ts file (program.getSourceFile is file-type dependent)
+    if (context.settings.exported === undefined && /\.ts$/.test(fileName)) {
       const packageExports = getLocalExports(context);
       if (packageExports !== undefined) {
         context.settings.exported = packageExports;
@@ -77,7 +120,8 @@ export = {
         return {};
       }
     }
-    const parserServices: ParserServices = context.parserServices as ParserServices;
+
+    const parserServices = context.parserServices as ParserServices;
     if (
       parserServices.program === undefined ||
       parserServices.esTreeNodeToTSNodeMap === undefined
@@ -88,23 +132,29 @@ export = {
     const typeChecker = parserServices.program.getTypeChecker();
     const converter = parserServices.esTreeNodeToTSNodeMap;
 
-    return /src/.test(fileName)
+    return shouldExamineFile(fileName, exclude)
       ? {
           // callback functions
+
+          // container declarations
           ":matches(TSInterfaceDeclaration, ClassDeclaration, TSModuleDeclaration)": (
             node: Node
-          ): void => {
-            reportInternal(node, context, converter, typeChecker);
-          },
+          ): void => reportInternal(node, context, converter, typeChecker),
 
+          // standalone functions
           ":function": (node: Node): void => {
-            context.getAncestors().every((ancestor: Node): boolean => {
-              return ![
-                "ClassBody",
-                "TSInterfaceBody",
-                "TSModuleBlock"
-              ].includes(ancestor.type);
-            }) && reportInternal(node, context, converter, typeChecker);
+            if (
+              context
+                .getAncestors()
+                .every(
+                  (ancestor: Node): boolean =>
+                    !["ClassBody", "TSInterfaceBody", "TSModuleBlock"].includes(
+                      ancestor.type
+                    )
+                )
+            ) {
+              reportInternal(node, context, converter, typeChecker);
+            }
           }
         }
       : {};

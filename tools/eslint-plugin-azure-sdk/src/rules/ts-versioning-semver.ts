@@ -3,10 +3,9 @@
  * @author Arpan Laha
  */
 
-import { getVerifiers, stripPath } from "../utils";
 import { Rule } from "eslint";
-import { Literal, Property } from "estree";
-import { getRuleMetaData } from "../utils";
+import { Property } from "estree";
+import { getRuleMetaData, getVerifiers, stripPath } from "../utils";
 
 //------------------------------------------------------------------------------
 // Rule Definition
@@ -39,7 +38,7 @@ export = {
               });
               return;
             }
-            const nodeValue: Literal = node.value as Literal;
+            const nodeValue = node.value;
             const version = nodeValue.value as string;
 
             // check for violations specific to semver
@@ -51,20 +50,24 @@ export = {
               return;
             }
             // check that if preview is in proper syntax if provided
-            !/^((0|[1-9](\d*))\.){2}(0|[1-9](\d*))(-preview\.(0|([1-9](\d*))))?$/.test(
-              version
-            ) &&
+            if (
+              !/^((0|[1-9](\d*))\.){2}(0|[1-9](\d*))(-preview\.(0|([1-9](\d*))))?$/.test(
+                version
+              )
+            ) {
               context.report({
                 node: nodeValue,
                 message: "preview format is not x.y.z-preview.i"
               });
+            }
 
             // check if major version is 0
-            /^0\./.test(version) &&
+            if (/^0\./.test(version)) {
               context.report({
                 node: nodeValue,
                 message: "major version should not be set to 0"
               });
+            }
           }
         } as Rule.RuleListener)
       : {};

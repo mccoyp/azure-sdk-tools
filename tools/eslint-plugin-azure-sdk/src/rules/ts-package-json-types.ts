@@ -3,10 +3,9 @@
  * @author Arpan Laha
  */
 
-import { getVerifiers, stripPath } from "../utils";
 import { Rule } from "eslint";
 import { Literal, Property } from "estree";
-import { getRuleMetaData } from "../utils";
+import { getRuleMetaData, getVerifiers, stripPath } from "../utils";
 
 //------------------------------------------------------------------------------
 // Rule Definition
@@ -33,19 +32,21 @@ export = {
           "ExpressionStatement > ObjectExpression > Property[key.value='types']": (
             node: Property
           ): void => {
-            node.value.type !== "Literal" &&
+            if (node.value.type !== "Literal") {
               context.report({
                 node: node.value,
                 message: "types is not set to a string"
               });
-            const nodeValue: Literal = node.value as Literal;
-
-            !/\.d\.ts$/.test(nodeValue.value as string) && // filename ending in '.d.ts'
+            }
+            const nodeValue = node.value as Literal;
+            // filename ending in '.d.ts'
+            if (!/\.d\.ts$/.test(nodeValue.value as string)) {
               context.report({
                 node: nodeValue,
                 message:
                   "provided types path is not a TypeScript declaration file"
               });
+            }
           }
         } as Rule.RuleListener)
       : {};

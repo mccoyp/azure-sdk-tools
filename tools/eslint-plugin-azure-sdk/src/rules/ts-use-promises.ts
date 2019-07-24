@@ -3,8 +3,8 @@
  * @author Arpan Laha
  */
 
-import { Rule } from "eslint";
 import { ParserServices } from "@typescript-eslint/experimental-utils";
+import { Rule } from "eslint";
 import { isExternalModule } from "typescript";
 import { getRuleMetaData } from "../utils";
 
@@ -37,16 +37,19 @@ export = {
         if (symbol === undefined) {
           return;
         }
+
         const declaration = symbol.valueDeclaration;
         if (declaration === undefined) {
           return;
         }
-        isExternalModule(declaration.getSourceFile()) &&
+
+        if (isExternalModule(declaration.getSourceFile())) {
           context.report({
             node: node,
             message:
               "promises should use the in-built Promise type, not libraries or polyfills"
           });
+        }
       }
     };
   }

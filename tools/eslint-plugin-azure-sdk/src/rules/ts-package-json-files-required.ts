@@ -3,10 +3,9 @@
  * @author Arpan Laha
  */
 
-import { getVerifiers, stripPath } from "../utils";
 import { Rule } from "eslint";
-import { ArrayExpression, Literal, Property } from "estree";
-import { getRuleMetaData } from "../utils";
+import { Literal, Property } from "estree";
+import { getRuleMetaData, getVerifiers, stripPath } from "../utils";
 
 //------------------------------------------------------------------------------
 // Rule Definition
@@ -41,37 +40,49 @@ export = {
               return;
             }
 
-            const nodeValue: ArrayExpression = node.value as ArrayExpression;
-            const elements: Literal[] = nodeValue.elements as Literal[];
+            const nodeValue = node.value;
+            const elements = nodeValue.elements as Literal[];
 
-            elements.every((element: Literal): boolean => {
-              // looks for 'dist' with optional leading './' and optional trailing '/'
-              return !/^(.\/)?((dist\/)|(dist$))/.test(element.value as string);
-            }) &&
+            // looks for 'dist' with optional leading './' and optional trailing '/'
+            if (
+              elements.every(
+                (element: Literal): boolean =>
+                  !/^(.\/)?((dist\/)|(dist$))/.test(element.value as string)
+              )
+            ) {
               context.report({
                 node: nodeValue,
                 message: "dist is not included in files"
               });
+            }
 
-            elements.every((element: Literal): boolean => {
-              // looks for 'dist-esm/src' with optional leading './' and optional trailing '/'
-              return !/^(.\/)?dist-esm\/((src\/)|(src$))/.test(
-                element.value as string
-              );
-            }) &&
+            // looks for 'dist-esm/src' with optional leading './' and optional trailing '/'
+            if (
+              elements.every(
+                (element: Literal): boolean =>
+                  !/^(.\/)?dist-esm\/((src\/)|(src$))/.test(
+                    element.value as string
+                  )
+              )
+            ) {
               context.report({
                 node: nodeValue,
                 message: "dist-esm/src is not included in files"
               });
+            }
 
-            elements.every((element: Literal): boolean => {
-              // looks for 'src' with optional leading './' and optional trailing '/ '
-              return !/^(.\/)?((src\/)|(src$))/.test(element.value as string);
-            }) &&
+            // looks for 'src' with optional leading './' and optional trailing '/ '
+            if (
+              elements.every(
+                (element: Literal): boolean =>
+                  !/^(.\/)?((src\/)|(src$))/.test(element.value as string)
+              )
+            ) {
               context.report({
                 node: nodeValue,
                 message: "src is not included in files"
               });
+            }
           }
         } as Rule.RuleListener)
       : {};
