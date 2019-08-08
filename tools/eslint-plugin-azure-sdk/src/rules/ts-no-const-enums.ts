@@ -13,22 +13,26 @@ import { getRuleMetaData } from "../utils";
 export = {
   meta: getRuleMetaData(
     "ts-no-const-enums",
-    "forbid usage of TypeScript's const enums"
+    "forbid usage of TypeScript's const enums",
+    "code"
   ),
   create: (context: Rule.RuleContext): Rule.RuleListener =>
-    /src/.test(context.getFilename())
-      ? ({
-          // callback functions
+    ({
+      // callback functions
 
-          // check Enum to make sure it doesn't have a const keyword
-          TSEnumDeclaration: (node: any): void => {
-            if (node.const !== undefined) {
-              context.report({
-                node: node,
-                message: "const enums should not be used"
-              });
-            }
-          }
-        } as Rule.RuleListener)
-      : {}
+      // check Enum to make sure it doesn't have a const keyword
+      TSEnumDeclaration: (node: any): void => {
+        if (node.const !== undefined) {
+          context.report({
+            node: node,
+            message: "const enums should not be used",
+            fix: (fixer: Rule.RuleFixer): Rule.Fix =>
+              fixer.removeRange([
+                node.range[0],
+                node.range[0] + "const ".length
+              ])
+          });
+        }
+      }
+    } as Rule.RuleListener)
 };

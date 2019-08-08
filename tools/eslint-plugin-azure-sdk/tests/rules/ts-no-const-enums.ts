@@ -1,5 +1,5 @@
 /**
- * @fileoverview Testing the ts-no-const-enumsrule.
+ * @fileoverview Testing the ts-no-const-enums rule.
  * @author Arpan Laha
  */
 
