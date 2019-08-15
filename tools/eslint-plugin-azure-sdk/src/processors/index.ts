@@ -1,5 +1,5 @@
 /**
- * @fileoverview Definition of processors
+ * @file Definition of processors
  * @author Arpan Laha
  */
 
@@ -20,6 +20,6 @@ export = {
         (message: Linter.LintMessage): boolean =>
           message.ruleId !== "no-unused-expressions"
       ),
-    supportsAutofix: false // TODO enable when ESLint is bumped to 6.x.x
+    supportsAutofix: true
   }
 };

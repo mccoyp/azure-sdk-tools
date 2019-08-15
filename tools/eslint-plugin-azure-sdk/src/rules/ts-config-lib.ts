@@ -1,5 +1,5 @@
 /**
- * @fileoverview Rule to force tsconfig.json's compilerOptions.lib value to be an empty array.
+ * @file Rule to force tsconfig.json's compilerOptions.lib value to be an empty array.
  * @author Arpan Laha
  */
 
@@ -37,7 +37,7 @@ export = {
           "ExpressionStatement > ObjectExpression > Property[key.value='compilerOptions'] > ObjectExpression > Property[key.value='lib']": (
             node: Property
           ): void => {
-            if (node.value.hasOwnProperty("elements")) {
+            if (node.value.type === "ArrayExpression") {
               const nodeValue = node.value as ArrayExpression;
               if (nodeValue.elements.length !== 0) {
                 context.report({

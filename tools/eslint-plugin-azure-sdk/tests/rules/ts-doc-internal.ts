@@ -1,5 +1,5 @@
 /**
- * @fileoverview Testing the ts-doc-internal rule.
+ * @file Testing the ts-doc-internal rule.
  * @author Arpan Laha
  */
 
@@ -11,8 +11,9 @@ import { RuleTester } from "eslint";
 //------------------------------------------------------------------------------
 
 const ruleTester = new RuleTester({
-  parser: "@typescript-eslint/parser",
+  parser: require.resolve("@typescript-eslint/parser"),
   parserOptions: {
+    createDefaultProgram: true,
     project: "./tsconfig.json"
   },
   settings: {

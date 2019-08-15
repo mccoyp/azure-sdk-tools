@@ -1,5 +1,5 @@
 /**
- * @fileoverview Testing the ts-use-promises rule.
+ * @file Testing the ts-use-promises rule.
  * @author Arpan Laha
  */
 
@@ -21,14 +21,15 @@ const promise = (): Promise<string> => {
 //------------------------------------------------------------------------------
 
 const ruleTester = new RuleTester({
-  parser: "@typescript-eslint/parser",
+  parser: require.resolve("@typescript-eslint/parser"),
   parserOptions: {
-    project: "./tsconfig.json",
-    ecmaVersion: 6,
-    sourceType: "module",
+    createDefaultProgram: true,
     ecmaFeatures: {
       modules: true
-    }
+    },
+    ecmaVersion: 6,
+    project: "./tsconfig.json",
+    sourceType: "module"
   }
 });
 

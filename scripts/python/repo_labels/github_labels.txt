@@ -17,11 +17,11 @@ Authentication
 Authorization
 Automation
 Azure Stack
-Azure Cloud Shell
 Batch
 BatchAI
 Billing
-Bot Services
+Blueprint
+Bot Service
 CDN
 Cloud Shell
 Cognitive Services
@@ -33,7 +33,7 @@ Compute - Managed Disks
 Compute - VM
 Compute - VMSS
 Consumption
-Container Instance
+Container Instances
 Container Registry
 Cosmos
 Customer Insights
@@ -50,18 +50,23 @@ Devtestlab
 Docs
 Event Grid
 Event Hub
+Functions
 Graph
+Guest Configuration
 HDInsight
 Import Export
 Intune
 Insights
 IotHub
 KeyVault
+Kusto
 Lab Services 
 Logic App
+Managed Identity
 Machine Learning
 Machine Learning Compute
 Machine Learning Experimentation
+ManagedServices
 Marketplace Ordering
 Media Services
 Migrate
@@ -78,13 +83,16 @@ Monitor - ApplicationInsights
 MySQL
 Network
 Network - Application Gateway
+Network - DDOS
+Network - DNS
 Network - Express Routes
 Network - Gateways
 Network - Load Balancer
-Network - Watcher
-Network - DNS
+Network - SDN
 Network - Traffic Manager
-Notification Hubs
+Network - VPN
+Network - Watcher
+Notification Hub
 Operational Insights
 Operations Management
 Policy
@@ -99,7 +107,6 @@ Relay
 Reservations
 Resource Authorization
 Resource Graph
-Resource Manager
 Resource Health
 Search
 Security
@@ -108,11 +115,20 @@ Server Management
 Service Bus
 Service Fabric
 Service Map
+SignalR
 SQL
+SQL - VM
+SQL - Backup & Restore
+SQL - Data Security
+SQL - Elastic Jobs
+SQL - Managed Instance
+SQL - Replication & Failover
 Storage
 Storsimple
 Stream Analytics
 Subscription
+Tables
 TimeseriesInsights
 Visual Studio
 vFXT
+Web Apps

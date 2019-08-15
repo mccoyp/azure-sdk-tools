@@ -1,5 +1,5 @@
 /**
- * @fileoverview Testing the ts-package-json-types rule.
+ * @file Testing the ts-package-json-types rule.
  * @author Arpan Laha
  */
 
@@ -241,8 +241,9 @@ const examplePackageBad = `{
 //------------------------------------------------------------------------------
 
 const ruleTester = new RuleTester({
-  parser: "@typescript-eslint/parser",
+  parser: require.resolve("@typescript-eslint/parser"),
   parserOptions: {
+    createDefaultProgram: true,
     project: "./tsconfig.json"
   }
 });

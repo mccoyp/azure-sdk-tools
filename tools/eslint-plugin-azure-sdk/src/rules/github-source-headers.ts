@@ -1,10 +1,11 @@
 /**
- * @fileoverview Rule to require copyright headers in every source file.
+ * @file Rule to require copyright headers in every source file.
  * @author Arpan Laha
  */
 
 import { Rule } from "eslint";
 import { Comment, Node } from "estree";
+import { get as getLevenshteinDistance } from "fast-levenshtein";
 import { getRuleMetaData } from "../utils";
 
 //------------------------------------------------------------------------------
@@ -13,6 +14,17 @@ import { getRuleMetaData } from "../utils";
 
 const expectedComments =
   "// Copyright (c) Microsoft Corporation.\n// Licensed under the MIT license.\n";
+
+const expectedLine1 = "Copyright (c) Microsoft Corporation.";
+const expectedLine2 = "Licensed under the MIT license.";
+
+const noCaseRegex1 = /Copyright \(c\) Microsoft Corporation\./i;
+const noCaseRegex2 = /Licensed under the MIT license\./i;
+
+/**
+ * Arbitrary Levenshtein distance cutoff.
+ */
+const levenshteinCutoff = 20;
 
 export = {
   meta: getRuleMetaData(
@@ -46,13 +58,11 @@ export = {
             if (
               headerComments.every(
                 (comment: Comment): boolean =>
-                  !/Copyright \(c\) Microsoft Corporation\./.test(
-                    comment.value
-                  ) ||
-                  headerComments.every(
-                    (comment: Comment): boolean =>
-                      !/Licensed under the MIT license\./.test(comment.value)
-                  )
+                  !comment.value.includes(expectedLine1)
+              ) ||
+              headerComments.every(
+                (comment: Comment): boolean =>
+                  !comment.value.includes(expectedLine2)
               )
             ) {
               context.report({
@@ -60,8 +70,35 @@ export = {
                 message:
                   "copyright header not properly configured - expected value:\n" +
                   "Copyright (c) Microsoft Corporation.\nLicensed under the MIT license.\n",
-                fix: (fixer: Rule.RuleFixer): Rule.Fix =>
-                  fixer.insertTextBefore(node, expectedComments)
+                fix: (fixer: Rule.RuleFixer): Rule.Fix => {
+                  // iterate over comments and replace with proper value if close enough
+                  for (const comment of headerComments) {
+                    const value = comment.value;
+                    if (
+                      !value.includes(expectedLine1) &&
+                      (noCaseRegex1.test(value) ||
+                        getLevenshteinDistance(expectedLine1, value) <
+                          levenshteinCutoff)
+                    ) {
+                      return fixer.replaceText(
+                        comment as any,
+                        `// ${expectedLine1}`
+                      );
+                    }
+                    if (
+                      !value.includes(expectedLine2) &&
+                      (noCaseRegex2.test(value) ||
+                        getLevenshteinDistance(expectedLine2, value) <
+                          levenshteinCutoff)
+                    ) {
+                      return fixer.replaceText(
+                        comment as any,
+                        `// ${expectedLine2}`
+                      );
+                    }
+                  }
+                  return fixer.insertTextBefore(node, expectedComments);
+                }
               });
             }
           }

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Testing the ts-config-target rule.
+ * @file Testing the ts-config-target rule.
  * @author Arpan Laha
  */
 
@@ -95,8 +95,9 @@ const exampleTsconfigBad = `{
 //------------------------------------------------------------------------------
 
 const ruleTester = new RuleTester({
-  parser: "@typescript-eslint/parser",
+  parser: require.resolve("@typescript-eslint/parser"),
   parserOptions: {
+    createDefaultProgram: true,
     project: "./tsconfig.json"
   }
 });
